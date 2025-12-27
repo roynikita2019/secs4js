@@ -1,5 +1,3 @@
-// TypeScript 等效实现
-
 /**
  * HSMS-SS 控制类型（PType + SType 组合）
  * 存储在 Header 的 Byte 4-5
