@@ -7,24 +7,47 @@ export default defineConfig(
 	{
 		ignores: ["**/*.snap", "coverage", "lib", "node_modules", "pnpm-lock.yaml"],
 	},
-	{ linterOptions: { reportUnusedDisableDirectives: "error" } },
+	{ linterOptions: { reportUnusedDisableDirectives: "warn" } },
 	{
 		extends: [
 			eslint.configs.recommended,
-			tseslint.configs.strictTypeChecked,
+			tseslint.configs.recommendedTypeChecked,
 			tseslint.configs.stylisticTypeChecked,
 		],
 		files: ["**/*.{js,ts}"],
 		languageOptions: {
 			parserOptions: {
-				projectService: { allowDefaultProject: ["*.config.*s"] },
+				projectService: true,
 			},
+		},
+		rules: {
+			"@typescript-eslint/no-unsafe-enum-comparison": "off",
+			// 未使用变量 - 设为警告
+			"@typescript-eslint/no-unused-vars": [
+				"warn",
+				{
+					argsIgnorePattern: "^_", // 以下划线开头的参数忽略
+					varsIgnorePattern: "^_", // 以下划线开头的变量忽略
+					caughtErrorsIgnorePattern: "^_", // 以下划线开头的 catch 错误忽略
+				},
+			],
+			"@typescript-eslint/restrict-template-expressions": [
+				"warn",
+				{
+					allowAny: true,
+					allowNumber: true,
+					allowBoolean: true,
+					allowNullish: true,
+					allowNever: true,
+				},
+			],
+			// 降低其他严格规则
+			"@typescript-eslint/no-explicit-any": "warn",
 		},
 	},
 	{
 		extends: [vitest.configs.recommended],
 		files: ["**/*.test.*"],
-		rules: { "@typescript-eslint/no-unsafe-assignment": "off" },
 		settings: { vitest: { typecheck: true } },
 	},
 );

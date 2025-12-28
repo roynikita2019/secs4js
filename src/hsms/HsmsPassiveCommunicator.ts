@@ -5,10 +5,10 @@ import {
 } from "./HsmsCommunicator.js";
 
 export class HsmsPassiveCommunicator extends HsmsCommunicator {
-  private server: Server | null = null;
+	private server: Server | null = null;
 
-  async open(): Promise<void> {
-    if (this.server) {
+	async open(): Promise<void> {
+		if (this.server) {
 			return; // Already listening
 		}
 
@@ -23,7 +23,7 @@ export class HsmsPassiveCommunicator extends HsmsCommunicator {
 				}
 
 				console.log(
-					`Accepted connection from ${socket.remoteAddress ?? 'unknown'}:${socket.remotePort ?? 'unknown'}`,
+					`Accepted connection from ${socket.remoteAddress ?? "unknown"}:${socket.remotePort ?? "unknown"}`,
 				);
 				this.handleSocketEvents(socket);
 			});

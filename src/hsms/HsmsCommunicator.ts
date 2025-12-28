@@ -1,10 +1,10 @@
 import { Socket } from "net";
 import {
-	SecsCommunicator,
+	AbstractSecsCommunicator,
 	SecsCommunicatorConfig,
-} from "../core/SecsCommunicator.js";
-import { SecsMessage } from "../core/SecsMessage.js";
-import { SecsItem } from "../core/secs2/SecsItem.js";
+} from "../core/AbstractSecsCommunicator.js";
+import { SecsMessage } from "../core/AbstractSecsMessage.js";
+import { AbstractSecs2Item } from "../core/secs2item/AbstractSecs2Item.js";
 import { HsmsMessage } from "./HsmsMessage.js";
 import { HsmsControlType } from "./enums/HsmsControlType.js";
 import { SelectStatus } from "./enums/SelectStatus.js";
@@ -21,7 +21,7 @@ export interface HsmsCommunicatorConfig extends SecsCommunicatorConfig {
 	port: number;
 }
 
-export abstract class HsmsCommunicator extends SecsCommunicator {
+export abstract class HsmsCommunicator extends AbstractSecsCommunicator {
 	public ip: string;
 	public port: number;
 
@@ -55,7 +55,7 @@ export abstract class HsmsCommunicator extends SecsCommunicator {
 		stream: number,
 		func: number,
 		wBit: boolean,
-		body: SecsItem | null,
+		body: AbstractSecs2Item | null,
 		systemBytes: number,
 	): SecsMessage {
 		// For Data messages, pType=0, sType=0 (Data)
@@ -106,7 +106,17 @@ export abstract class HsmsCommunicator extends SecsCommunicator {
 				const msg = HsmsMessage.fromBuffer(msgBuffer);
 				this.processHsmsMessage(msg);
 			} catch (err) {
-				this.emit("error", new Error(`Failed to parse HSMS message: ${err}`));
+				if (err instanceof Error) {
+					this.emit(
+						"error",
+						new Error(`Failed to parse HSMS message: ${err.message}`),
+					);
+				} else {
+					this.emit(
+						"error",
+						new Error(`Failed to parse HSMS message: ${String(err)}`),
+					);
+				}
 			}
 		}
 	}
@@ -122,7 +132,7 @@ export abstract class HsmsCommunicator extends SecsCommunicator {
 		if (this.state !== HsmsState.Selected) {
 			// Received Data message while not Selected -> Reject?
 			// Or ignore? Standard says usually Reject with reason NotSelected.
-			this.sendReject(msg, RejectReason.NotSelected);
+			void this.sendReject(msg, RejectReason.NotSelected);
 			return;
 		}
 
@@ -193,8 +203,8 @@ export abstract class HsmsCommunicator extends SecsCommunicator {
 	}
 
 	protected handleLinkTestReq(msg: HsmsMessage) {
-    void this.sendLinkTestRsp(msg);
-  }
+		void this.sendLinkTestRsp(msg);
+	}
 
 	protected handleLinkTestRsp(msg: HsmsMessage) {
 		const tx = this._transactions.get(msg.systemBytes);
@@ -206,10 +216,10 @@ export abstract class HsmsCommunicator extends SecsCommunicator {
 	}
 
 	protected handleSeparateReq(_msg: HsmsMessage) {
-    this.state = HsmsState.Connected; // Downgrade
-    // Usually close connection
-    void this.close();
-  }
+		this.state = HsmsState.Connected; // Downgrade
+		// Usually close connection
+		void this.close();
+	}
 
 	// Helper senders
 	protected async sendSelectRsp(req: HsmsMessage, status: SelectStatus) {

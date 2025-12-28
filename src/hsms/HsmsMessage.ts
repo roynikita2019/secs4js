@@ -1,5 +1,5 @@
-import { SecsMessage } from "../core/SecsMessage.js";
-import { SecsItem } from "../core/secs2/SecsItem.js";
+import { SecsMessage } from "../core/AbstractSecsMessage.js";
+import { AbstractSecs2Item } from "../core/secs2item/AbstractSecs2Item.js";
 import { HsmsControlType } from "./enums/HsmsControlType.js";
 import { SelectStatus } from "./enums/SelectStatus.js";
 import { RejectReason } from "./enums/RejectReason.js";
@@ -9,7 +9,7 @@ export class HsmsMessage extends SecsMessage {
 		stream: number,
 		func: number,
 		wBit: boolean,
-		body: SecsItem | null,
+		body: AbstractSecs2Item | null,
 		systemBytes: number,
 		deviceId: number,
 		public readonly pType = 0,
@@ -81,10 +81,10 @@ export class HsmsMessage extends SecsMessage {
 	}
 
 	isDataMessage(): boolean {
-    return (this.sType as HsmsControlType) === HsmsControlType.Data;
-  }
+		return (this.sType as HsmsControlType) === HsmsControlType.Data;
+	}
 
-  static fromBuffer(buffer: Buffer): HsmsMessage {
+	static fromBuffer(buffer: Buffer): HsmsMessage {
 		if (buffer.length < 14) {
 			throw new Error("Buffer too short for HSMS message");
 		}
@@ -104,15 +104,15 @@ export class HsmsMessage extends SecsMessage {
 		let func = 0;
 		let wBit = false;
 		const deviceId = sessionId;
-		let body: SecsItem | null = null;
+		let body: AbstractSecs2Item | null = null;
 
-    if ((sType as HsmsControlType) === HsmsControlType.Data) {
-      stream = byte2 & 0x7f;
-      wBit = (byte2 & 0x80) !== 0;
+		if ((sType as HsmsControlType) === HsmsControlType.Data) {
+			stream = byte2 & 0x7f;
+			wBit = (byte2 & 0x80) !== 0;
 			func = byte3;
 
 			if (bodyBuffer.length > 0) {
-				const result = SecsItem.fromBuffer(bodyBuffer);
+				const result = AbstractSecs2Item.fromBuffer(bodyBuffer);
 				body = result.item;
 			}
 		} else {
