@@ -1,6 +1,6 @@
 {
 	"name": "secs4js",
-	"version": "0.0.0",
+	"version": "0.1.0",
 	"description": "A simple, efficient, and user-friendly SECS/GEM protocol library implemented in TypeScript.",
 	"repository": {
 		"type": "git",
@@ -8,11 +8,12 @@
 	},
 	"license": "MIT",
 	"author": {
-		"name": "冉千",
+		"name": "Ran Qian",
 		"email": "1151264028@qq.com"
 	},
 	"type": "module",
-	"main": "lib/index.js",
+	"main": "./lib/index.js",
+	"types": "./lib/index.d.ts",
 	"files": [
 		"lib/"
 	],
@@ -20,6 +21,7 @@
 		"build": "tsdown",
 		"format": "prettier .",
 		"lint": "eslint . --max-warnings 0",
+		"prepublishOnly": "pnpm build",
 		"prepare": "husky",
 		"test": "vitest",
 		"tsc": "tsc"
