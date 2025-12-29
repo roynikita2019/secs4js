@@ -44,6 +44,7 @@ export abstract class Secs1Communicator extends AbstractSecsCommunicator {
 	private expectedBlockNum = 1;
 	private currentBlockLength = 0;
 
+	private t1Timer: NodeJS.Timeout | null = null;
 	private t2Timer: NodeJS.Timeout | null = null;
 	private t4Timer: NodeJS.Timeout | null = null;
 
@@ -60,6 +61,12 @@ export abstract class Secs1Communicator extends AbstractSecsCommunicator {
 
 		stream.on("data", (data: Buffer) => {
 			this.buffer = Buffer.concat([this.buffer, data]);
+			if (
+				this.state === CommState.WAIT_BLOCK_LENGTH ||
+				this.state === CommState.WAIT_BLOCK_DATA
+			) {
+				this.startT1();
+			}
 			this.processBuffer();
 		});
 
@@ -67,7 +74,7 @@ export abstract class Secs1Communicator extends AbstractSecsCommunicator {
 			this.rejectAllTransactions(new Error("Stream closed"));
 			this.stream = null;
 			this.emit("disconnected");
-			this.stopTimers();
+			this.stopAllTimers();
 			this.resetState();
 		});
 
@@ -85,7 +92,7 @@ export abstract class Secs1Communicator extends AbstractSecsCommunicator {
 			stream.destroy();
 		}
 		this.stream = null;
-		this.stopTimers();
+		this.stopAllTimers();
 		this.resetState();
 	}
 
@@ -112,30 +119,64 @@ export abstract class Secs1Communicator extends AbstractSecsCommunicator {
 		);
 	}
 
-	private stopTimers() {
+	private clearT1() {
+		if (this.t1Timer) {
+			clearTimeout(this.t1Timer);
+			this.t1Timer = null;
+		}
+	}
+
+	private clearT2() {
 		if (this.t2Timer) {
 			clearTimeout(this.t2Timer);
 			this.t2Timer = null;
 		}
+	}
+
+	private clearT4() {
 		if (this.t4Timer) {
 			clearTimeout(this.t4Timer);
 			this.t4Timer = null;
 		}
 	}
 
+	private stopAllTimers() {
+		this.clearT1();
+		this.clearT2();
+		this.clearT4();
+	}
+
+	private startT1() {
+		this.clearT1();
+		if (this.timeoutT1 <= 0) return;
+		this.t1Timer = setTimeout(() => {
+			this.handleT1Timeout();
+		}, this.timeoutT1 * 1000);
+	}
+
 	private startT2() {
-		this.stopTimers();
-		const timeout = this.timeoutT6 * 1000;
+		this.clearT2();
+		if (this.timeoutT2 <= 0) return;
+		const timeout = this.timeoutT2 * 1000;
 		this.t2Timer = setTimeout(() => {
 			this.handleT2Timeout();
 		}, timeout);
 	}
 
 	private startT4() {
-		const timeout = this.timeoutT7 * 1000;
+		this.clearT4();
+		if (this.timeoutT4 <= 0) return;
+		const timeout = this.timeoutT4 * 1000;
 		this.t4Timer = setTimeout(() => {
 			this.handleT4Timeout();
 		}, timeout);
+	}
+
+	private handleT1Timeout() {
+		console.warn("T1 Timeout");
+		this.t1Timer = null;
+		this.emit("error", new Error("T1 Timeout"));
+		this.resetState();
 	}
 
 	private handleT2Timeout() {
@@ -180,7 +221,7 @@ export abstract class Secs1Communicator extends AbstractSecsCommunicator {
 		this.receivedBlocks = [];
 		this.expectedBlockNum = 1;
 		this.currentBlockLength = 0;
-		this.stopTimers();
+		this.stopAllTimers();
 	}
 
 	private sendByte(byte: number) {
@@ -201,7 +242,7 @@ export abstract class Secs1Communicator extends AbstractSecsCommunicator {
 						this.state = CommState.WAIT_BLOCK_LENGTH;
 						this.receivedBlocks = [];
 						this.expectedBlockNum = 1;
-						this.startT2();
+						this.startT1();
 					}
 					break;
 				}
@@ -209,17 +250,17 @@ export abstract class Secs1Communicator extends AbstractSecsCommunicator {
 					const byte = this.buffer[0];
 					this.buffer = this.buffer.subarray(1);
 					if (byte === EOT) {
-						this.stopTimers();
+						this.clearT2();
 						this.currentBlockIndex = 0;
 						this.sendCurrentBlock();
 					} else if (byte === ENQ) {
 						if (!this.isMaster) {
-							this.stopTimers();
+							this.clearT2();
 							this.sendByte(EOT);
 							this.state = CommState.WAIT_BLOCK_LENGTH;
 							this.receivedBlocks = [];
 							this.expectedBlockNum = 1;
-							this.startT2();
+							this.startT1();
 						}
 					}
 					break;
@@ -228,7 +269,7 @@ export abstract class Secs1Communicator extends AbstractSecsCommunicator {
 					const byte = this.buffer[0];
 					this.buffer = this.buffer.subarray(1);
 					if (byte === ACK) {
-						this.stopTimers();
+						this.clearT2();
 						const currentBlock = this.currentBlocks[this.currentBlockIndex];
 						if (currentBlock.eBit) {
 							this.currentBlocks = [];
@@ -240,12 +281,16 @@ export abstract class Secs1Communicator extends AbstractSecsCommunicator {
 							this.sendCurrentBlock();
 						}
 					} else if (byte === NAK) {
-						this.stopTimers();
+						this.clearT2();
 						this.handleT2Timeout();
 					}
 					break;
 				}
 				case CommState.WAIT_BLOCK_LENGTH: {
+					if (this.t4Timer) {
+						this.clearT4();
+						this.startT1();
+					}
 					const len = this.buffer[0];
 					if (len < 10) {
 						this.buffer = this.buffer.subarray(1);
@@ -253,7 +298,7 @@ export abstract class Secs1Communicator extends AbstractSecsCommunicator {
 						this.currentBlockLength = len;
 						this.buffer = this.buffer.subarray(1);
 						this.state = CommState.WAIT_BLOCK_DATA;
-						this.startT2();
+						this.startT1();
 					}
 					break;
 				}
@@ -264,7 +309,7 @@ export abstract class Secs1Communicator extends AbstractSecsCommunicator {
 							this.currentBlockLength + 2,
 						);
 						this.buffer = this.buffer.subarray(this.currentBlockLength + 2);
-						this.stopTimers();
+						this.stopAllTimers();
 
 						const fullBlockBuffer = Buffer.alloc(1 + blockData.length);
 						fullBlockBuffer[0] = this.currentBlockLength;

@@ -13,7 +13,10 @@ export interface SecsCommunicatorConfig {
 	deviceId: number;
 	isEquip: boolean;
 	name?: string;
+	timeoutT1?: number;
+	timeoutT2?: number;
 	timeoutT3?: number;
+	timeoutT4?: number;
 	timeoutT5?: number;
 	timeoutT6?: number;
 	timeoutT7?: number;
@@ -28,7 +31,10 @@ export abstract class AbstractSecsCommunicator<
 	public readonly isEquip: boolean;
 	public readonly name: string;
 
+	public timeoutT1 = 1;
+	public timeoutT2 = 15;
 	public timeoutT3 = 45;
+	public timeoutT4 = 45;
 	public timeoutT5 = 10;
 	public timeoutT6 = 5;
 	public timeoutT7 = 10;
@@ -49,7 +55,10 @@ export abstract class AbstractSecsCommunicator<
 		this.deviceId = config.deviceId;
 		this.isEquip = config.isEquip;
 		this.name = config.name ?? "SecsCommunicator";
+		if (config.timeoutT1 !== undefined) this.timeoutT1 = config.timeoutT1;
+		if (config.timeoutT2 !== undefined) this.timeoutT2 = config.timeoutT2;
 		if (config.timeoutT3 !== undefined) this.timeoutT3 = config.timeoutT3;
+		if (config.timeoutT4 !== undefined) this.timeoutT4 = config.timeoutT4;
 		if (config.timeoutT5 !== undefined) this.timeoutT5 = config.timeoutT5;
 		if (config.timeoutT6 !== undefined) this.timeoutT6 = config.timeoutT6;
 		if (config.timeoutT7 !== undefined) this.timeoutT7 = config.timeoutT7;

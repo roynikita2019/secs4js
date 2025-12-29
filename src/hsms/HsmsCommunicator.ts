@@ -35,6 +35,7 @@ export abstract class HsmsCommunicator extends AbstractSecsCommunicator<HsmsComm
 	protected socket: Socket | null = null;
 	protected state: HsmsState = HsmsState.NotConnected;
 	private buffer: Buffer = Buffer.alloc(0);
+	private t7Timer: NodeJS.Timeout | null = null;
 	private t8Timer: NodeJS.Timeout | null = null;
 
 	// T6 Timer (Control Transaction)
@@ -82,6 +83,7 @@ export abstract class HsmsCommunicator extends AbstractSecsCommunicator<HsmsComm
 	protected handleSocketEvents(socket: Socket) {
 		this.socket = socket;
 		this.state = HsmsState.Connected;
+		this.resetT7Timer();
 		this.emit("connected");
 
 		socket.on("data", (data) => {
@@ -95,6 +97,7 @@ export abstract class HsmsCommunicator extends AbstractSecsCommunicator<HsmsComm
 
 		socket.on("close", () => {
 			this.rejectAllTransactions(new Error("Socket closed"));
+			this.clearT7Timer();
 			this.clearT8Timer();
 			this.buffer = Buffer.alloc(0);
 			this.state = HsmsState.NotConnected;
@@ -111,6 +114,27 @@ export abstract class HsmsCommunicator extends AbstractSecsCommunicator<HsmsComm
 		socket.on("error", (err) => {
 			this.emit("error", err);
 		});
+	}
+
+	private resetT7Timer() {
+		this.clearT7Timer();
+		if (this.timeoutT7 <= 0) return;
+		this.t7Timer = setTimeout(() => {
+			this.t7Timer = null;
+			if (this.state === HsmsState.Selected) return;
+			const socket = this.socket;
+			if (socket && !socket.destroyed) {
+				this.emit("error", new Error("T7 Timeout"));
+				socket.destroy();
+			}
+		}, this.timeoutT7 * 1000);
+	}
+
+	private clearT7Timer() {
+		if (this.t7Timer) {
+			clearTimeout(this.t7Timer);
+			this.t7Timer = null;
+		}
 	}
 
 	private resetT8Timer() {
@@ -233,6 +257,7 @@ export abstract class HsmsCommunicator extends AbstractSecsCommunicator<HsmsComm
 			void this.sendSelectRsp(msg, SelectStatus.Actived); // Or AlreadyUsed?
 		} else {
 			this.state = HsmsState.Selected;
+			this.clearT7Timer();
 			void this.sendSelectRsp(msg, SelectStatus.Success);
 			this.emit("selected");
 		}
@@ -249,6 +274,7 @@ export abstract class HsmsCommunicator extends AbstractSecsCommunicator<HsmsComm
 			const status = msg.func as SelectStatus;
 			if (status === SelectStatus.Success || status === SelectStatus.Actived) {
 				this.state = HsmsState.Selected;
+				this.clearT7Timer();
 				this.emit("selected");
 			}
 			clearTimeout(tx.timer);
@@ -277,6 +303,7 @@ export abstract class HsmsCommunicator extends AbstractSecsCommunicator<HsmsComm
 	protected handleDeselectReq(msg: HsmsMessage) {
 		if (this.state === HsmsState.Selected) {
 			this.state = HsmsState.Connected;
+			this.resetT7Timer();
 			void this.sendDeselectRsp(msg, SelectStatus.Success);
 			this.emit("deselected");
 			return;
@@ -290,6 +317,7 @@ export abstract class HsmsCommunicator extends AbstractSecsCommunicator<HsmsComm
 			const status = msg.func as SelectStatus;
 			if (status === SelectStatus.Success) {
 				this.state = HsmsState.Connected;
+				this.resetT7Timer();
 				this.emit("deselected");
 			}
 			clearTimeout(tx.timer);
@@ -303,6 +331,7 @@ export abstract class HsmsCommunicator extends AbstractSecsCommunicator<HsmsComm
 	protected handleSeparateReq(_msg: HsmsMessage) {
 		const socket = this.socket;
 		this.state = HsmsState.Connected;
+		this.clearT7Timer();
 		if (socket && !socket.destroyed) {
 			socket.destroy();
 		}
@@ -404,6 +433,7 @@ export abstract class HsmsCommunicator extends AbstractSecsCommunicator<HsmsComm
 		await this.sendBuffer(msg.toBuffer());
 		const socket = this.socket;
 		this.state = HsmsState.Connected;
+		this.clearT7Timer();
 		if (socket && !socket.destroyed) {
 			socket.destroy();
 		}
