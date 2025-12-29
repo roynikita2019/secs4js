@@ -3,6 +3,7 @@ import { AbstractSecs2Item } from "../core/secs2item/AbstractSecs2Item.js";
 import { HsmsControlType } from "./enums/HsmsControlType.js";
 import { SelectStatus } from "./enums/SelectStatus.js";
 import { RejectReason } from "./enums/RejectReason.js";
+import { Secs2ItemParser } from "../core/secs2item/Secs2ItemParser.js";
 
 export class HsmsMessage extends SecsMessage {
 	constructor(
@@ -112,7 +113,7 @@ export class HsmsMessage extends SecsMessage {
 			func = byte3;
 
 			if (bodyBuffer.length > 0) {
-				const result = AbstractSecs2Item.fromBuffer(bodyBuffer);
+				const result = Secs2ItemParser.fromBuffer(bodyBuffer);
 				body = result.item;
 			}
 		} else {

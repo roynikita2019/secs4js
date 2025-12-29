@@ -10,7 +10,7 @@ export class Secs2ItemList extends AbstractSecs2Item<AbstractSecs2Item[]> {
 		if (this._value.length === 0) {
 			return "<L [0] >";
 		}
-		const lines = ["<L [", this._value.length.toString(), "] "];
+		const lines = [`<L [${this._value.length.toString()}] `];
 		for (const item of this._value) {
 			lines.push("  " + item.toSml().replace(/\n/g, "\n  "));
 		}
@@ -21,7 +21,8 @@ export class Secs2ItemList extends AbstractSecs2Item<AbstractSecs2Item[]> {
 	override toBuffer(): Buffer {
 		const buffers = this._value.map((item) => item.toBuffer());
 		const valueBuffer = Buffer.concat(buffers);
-		const header = this.createHeader(valueBuffer.length);
+		// For List, length is number of items, not byte length
+		const header = this.createHeader(this._value.length);
 		return Buffer.concat([header, valueBuffer]);
 	}
 }

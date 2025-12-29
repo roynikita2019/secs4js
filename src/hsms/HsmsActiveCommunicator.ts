@@ -3,6 +3,7 @@ import {
 	HsmsCommunicator,
 	HsmsCommunicatorConfig,
 } from "./HsmsCommunicator.js";
+import { SelectStatus } from "./enums/SelectStatus.js";
 
 export class HsmsActiveCommunicator extends HsmsCommunicator {
 	async open(): Promise<void> {
@@ -26,6 +27,10 @@ export class HsmsActiveCommunicator extends HsmsCommunicator {
 				resolve();
 			});
 		});
+	}
+
+	async untilConnected(): Promise<boolean> {
+		return (await this.sendSelectReq()) === SelectStatus.Actived;
 	}
 
 	async close(): Promise<void> {

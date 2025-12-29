@@ -21,6 +21,7 @@ export default defineConfig(
 			},
 		},
 		rules: {
+			"@typescript-eslint/require-await": "warn",
 			"@typescript-eslint/no-unsafe-enum-comparison": "off",
 			// 未使用变量 - 设为警告
 			"@typescript-eslint/no-unused-vars": [
@@ -41,7 +42,6 @@ export default defineConfig(
 					allowNever: true,
 				},
 			],
-			// 降低其他严格规则
 			"@typescript-eslint/no-explicit-any": "warn",
 		},
 	},
