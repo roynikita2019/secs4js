@@ -17,6 +17,10 @@ async function SerialActive() {
 		})();
 	});
 
+	active.on("connected", () => {
+		console.log("Active connected");
+	});
+
 	await active.open();
 	console.log("Active opened");
 }

@@ -2,6 +2,13 @@ import { EventEmitter } from "events";
 import { SecsMessage } from "./AbstractSecsMessage.js";
 import { AbstractSecs2Item } from "./secs2item/AbstractSecs2Item.js";
 
+export interface SecsCommunicatorEvents {
+	message: [SecsMessage];
+	error: [Error];
+	connected: [];
+	disconnected: [];
+}
+
 export interface SecsCommunicatorConfig {
 	deviceId: number;
 	isEquip: boolean;
@@ -13,7 +20,10 @@ export interface SecsCommunicatorConfig {
 	timeoutT8?: number;
 }
 
-export abstract class AbstractSecsCommunicator extends EventEmitter {
+export abstract class AbstractSecsCommunicator<
+	Events extends Record<keyof Events, unknown[]> & SecsCommunicatorEvents =
+		SecsCommunicatorEvents,
+> extends EventEmitter<Events> {
 	public readonly deviceId: number;
 	public readonly isEquip: boolean;
 	public readonly name: string;
@@ -48,6 +58,19 @@ export abstract class AbstractSecsCommunicator extends EventEmitter {
 
 	abstract open(): Promise<void>;
 	abstract close(): Promise<void>;
+
+	protected emitInternal(
+		eventName: string | symbol,
+		...args: unknown[]
+	): boolean {
+		return (
+			super.emit as (
+				this: AbstractSecsCommunicator<Events>,
+				eventName: string | symbol,
+				...args: unknown[]
+			) => boolean
+		).call(this, eventName, ...args);
+	}
 
 	// This method sends the message bytes. To be implemented by subclasses.
 	protected abstract sendBuffer(buffer: Buffer): Promise<void>;
@@ -134,6 +157,6 @@ export abstract class AbstractSecsCommunicator extends EventEmitter {
 		}
 
 		// If not a reply, emit event
-		this.emit("message", msg);
+		this.emitInternal("message", msg);
 	}
 }

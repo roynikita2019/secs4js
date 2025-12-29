@@ -2,6 +2,7 @@ import { Socket } from "net";
 import {
 	AbstractSecsCommunicator,
 	SecsCommunicatorConfig,
+	SecsCommunicatorEvents,
 } from "../core/AbstractSecsCommunicator.js";
 import { SecsMessage } from "../core/AbstractSecsMessage.js";
 import { AbstractSecs2Item } from "../core/secs2item/AbstractSecs2Item.js";
@@ -22,7 +23,12 @@ export interface HsmsCommunicatorConfig extends SecsCommunicatorConfig {
 	linkTestInterval?: number;
 }
 
-export abstract class HsmsCommunicator extends AbstractSecsCommunicator {
+export interface HsmsCommunicatorEvents extends SecsCommunicatorEvents {
+	selected: [];
+	deselected: [];
+}
+
+export abstract class HsmsCommunicator extends AbstractSecsCommunicator<HsmsCommunicatorEvents> {
 	public ip: string;
 	public port: number;
 

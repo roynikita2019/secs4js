@@ -287,7 +287,10 @@ export abstract class Secs1Communicator extends AbstractSecsCommunicator {
 										const msg = Secs1Message.fromBlocks(this.receivedBlocks);
 										this.handleMessage(msg);
 									} catch (e) {
-										this.emit("error", e);
+										this.emit(
+											"error",
+											e instanceof Error ? e : new Error(String(e)),
+										);
 									}
 									this.resetState();
 									this.processSendQueue();
@@ -393,7 +396,7 @@ export abstract class Secs1Communicator extends AbstractSecsCommunicator {
 			this.state = CommState.WAIT_EOT;
 			this.startT2();
 		} catch (e) {
-			this.emit("error", e);
+			this.emit("error", e instanceof Error ? e : new Error(String(e)));
 			this.processSendQueue();
 		}
 	}
