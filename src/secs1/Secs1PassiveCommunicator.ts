@@ -89,7 +89,7 @@ export class Secs1PassiveCommunicator extends AbstractSecsCommunicator {
 		});
 	}
 
-	async close(): Promise<void> {
+	close(): Promise<void> {
 		if (this.socket) {
 			this.socket.destroy();
 			this.socket = null;
@@ -99,6 +99,7 @@ export class Secs1PassiveCommunicator extends AbstractSecsCommunicator {
 			this.server = null;
 		}
 		this.stopTimers();
+		return Promise.resolve();
 	}
 
 	private handleSocket(socket: Socket) {
@@ -453,9 +454,10 @@ export class Secs1PassiveCommunicator extends AbstractSecsCommunicator {
 		}
 	}
 
-	protected async sendBuffer(buffer: Buffer): Promise<void> {
+	protected sendBuffer(buffer: Buffer): Promise<void> {
 		this.sendQueue.push(buffer);
 		process.nextTick(() => this.processSendQueue());
+		return Promise.resolve();
 	}
 
 	protected createMessage(

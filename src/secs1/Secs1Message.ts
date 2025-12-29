@@ -11,7 +11,7 @@ export class Secs1Message extends SecsMessage {
 		body: AbstractSecs2Item | null,
 		systemBytes: number,
 		deviceId: number,
-		public readonly rBit: boolean = false,
+		public readonly rBit = false,
 	) {
 		super(stream, func, wBit, body, systemBytes, deviceId);
 	}

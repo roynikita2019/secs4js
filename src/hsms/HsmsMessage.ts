@@ -1,7 +1,6 @@
 import { SecsMessage } from "../core/AbstractSecsMessage.js";
 import { AbstractSecs2Item } from "../core/secs2item/AbstractSecs2Item.js";
 import { HsmsControlType } from "./enums/HsmsControlType.js";
-import { SelectStatus } from "./enums/SelectStatus.js";
 import { RejectReason } from "./enums/RejectReason.js";
 import { Secs2ItemParser } from "../core/secs2item/Secs2ItemParser.js";
 
@@ -151,7 +150,7 @@ export class HsmsMessage extends SecsMessage {
 		);
 	}
 
-	static selectRsp(req: HsmsMessage, status: SelectStatus): HsmsMessage {
+	static selectRsp(req: HsmsMessage, status: number): HsmsMessage {
 		return new HsmsMessage(
 			0,
 			status,
@@ -177,7 +176,7 @@ export class HsmsMessage extends SecsMessage {
 		);
 	}
 
-	static deselectRsp(req: HsmsMessage, status: SelectStatus): HsmsMessage {
+	static deselectRsp(req: HsmsMessage, status: number): HsmsMessage {
 		return new HsmsMessage(
 			0,
 			status,

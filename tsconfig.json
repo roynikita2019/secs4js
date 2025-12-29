@@ -11,5 +11,11 @@
 		"strict": true,
 		"target": "ES2022"
 	},
-	"include": ["src", "examples"]
+	"include": [
+		"src",
+		"examples",
+		"eslint.config.js",
+		"tsdown.config.ts",
+		"vitest.config.ts"
+	]
 }

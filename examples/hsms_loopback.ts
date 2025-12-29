@@ -1,7 +1,5 @@
 import { HsmsActiveCommunicator } from "../src/hsms/HsmsActiveCommunicator.js";
-import { HsmsPassiveCommunicator } from "../src/hsms/HsmsPassiveCommunicator.js";
 import { SecsMessage } from "../src/index.js";
-import { createListItem, createAsciiItem } from "../src/index.js";
 
 async function main() {
 	// const passive = new HsmsPassiveCommunicator({
@@ -42,20 +40,28 @@ async function main() {
 		isEquip: false,
 	});
 
+	active.on("connected", () => console.log("Active TCP Connected"));
+	active.on("disconnected", () => console.log("Active Disconnected"));
+	active.on("selected", () => console.log("Active Selected (HSMS Ready)"));
+
 	await active.open();
 	console.log("Active opened");
 
-	// Active usually sends SelectReq first
-	const status = await active.sendSelectReq();
-	console.log(`Active Selected: ${status}`);
+	// Active will automatically send SelectReq and start heartbeat
+
+	await active.untilConnected(); // Wait for Select success
+
+	active.on("message", (msg: SecsMessage) => {
+		console.log(`Active received: ${msg.toSml()}`);
+	});
 
 	const reply = await active.send(1, 1, true);
 	console.log(`Active received reply: ${reply?.toSml()}`);
+
+	// Keep running to allow testing disconnect/reconnect manually
 	setTimeout(() => {
 		return 0;
 	}, 10000000);
-	// await active.close();
-	// await passive.close();
 }
 
 main().catch(console.error);
