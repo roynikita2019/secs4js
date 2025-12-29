@@ -54,13 +54,18 @@ export class SmlParser {
 		const wBit = match[3].toUpperCase() === "W";
 		const bodyStr = match[4].trim();
 
-		let body: AbstractSecs2Item | null = null;
-		if (bodyStr.length > 0) {
-			const cursor = new SmlCursor(bodyStr);
-			body = this.parseItem(cursor);
-		}
+		const body = this.parseBody(bodyStr);
 
 		return new SecsMessage(stream, func, wBit, body);
+	}
+
+	static parseBody(smlBody: string): AbstractSecs2Item | null {
+		const trimmed = smlBody.trim();
+		if (trimmed.length === 0) {
+			return null;
+		}
+		const cursor = new SmlCursor(trimmed);
+		return this.parseItem(cursor);
 	}
 
 	private static parseItem(cursor: SmlCursor): AbstractSecs2Item {
