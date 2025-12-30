@@ -499,14 +499,16 @@ export class SecsLogger {
 			isEquip: ctx.isEquip,
 		};
 
+		const detailPrettyStream = new PrettyPrintTransformStream();
+		detailPrettyStream.pipe(detailStream);
 		const detailStreams: pino.StreamEntry[] = [
-			{ stream: detailStream as pino.DestinationStream },
+			{ stream: detailPrettyStream as pino.DestinationStream },
 		];
 		if (consoleEnabled) {
-			const prettyStream = new PrettyPrintTransformStream();
-			prettyStream.pipe(process.stdout);
+			const consolePrettyStream = new PrettyPrintTransformStream();
+			consolePrettyStream.pipe(process.stdout);
 			detailStreams.push({
-				stream: prettyStream,
+				stream: consolePrettyStream,
 				level: detailLevel as pino.Level,
 			});
 		}
@@ -515,8 +517,11 @@ export class SecsLogger {
 			pino.multistream(detailStreams),
 		);
 
+		const secs2ToDetailPrettyStream = new PrettyPrintTransformStream();
+		secs2ToDetailPrettyStream.pipe(detailStream);
 		const secs2Streams: pino.StreamEntry[] = [
 			{ stream: secs2Stream as pino.DestinationStream },
+			{ stream: secs2ToDetailPrettyStream as pino.DestinationStream },
 		];
 		if (consoleEnabled) {
 			secs2Streams.push({
@@ -527,7 +532,7 @@ export class SecsLogger {
 		const secs2 = pino(
 			{
 				level: secs2Level,
-				base: null,
+				base: bindings,
 				messageKey: "msg",
 			},
 			pino.multistream(secs2Streams),
