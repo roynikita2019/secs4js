@@ -31,3 +31,5 @@ export * from "./secs1/Secs1SerialCommunicator.js";
 
 export * from "./gem/Clock.js";
 export * from "./gem/Gem.js";
+
+export * from "./sml/SmlParser.js";
