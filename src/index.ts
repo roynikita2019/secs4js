@@ -12,6 +12,8 @@ export * from "./core/secs2item/Secs2ItemBinary.js";
 
 export * from "./helper/Secs2ItemHelper.js";
 
+export * from "./logging/SecsLogger.js";
+
 export * from "./hsms/HsmsMessage.js";
 export * from "./hsms/HsmsCommunicator.js";
 export * from "./hsms/HsmsActiveCommunicator.js";

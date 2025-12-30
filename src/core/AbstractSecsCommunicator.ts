@@ -1,6 +1,7 @@
 import { EventEmitter } from "events";
 import { SecsMessage } from "./AbstractSecsMessage.js";
 import { AbstractSecs2Item } from "./secs2item/AbstractSecs2Item.js";
+import { SecsLogger, type SecsLoggerConfig } from "../logging/SecsLogger.js";
 
 /**
  * @param message The message received.
@@ -32,6 +33,7 @@ export interface SecsCommunicatorConfig {
 	deviceId: number;
 	isEquip: boolean;
 	name?: string;
+	log?: SecsLoggerConfig;
 	timeoutT1?: number;
 	timeoutT2?: number;
 	timeoutT3?: number;
@@ -49,6 +51,7 @@ export abstract class AbstractSecsCommunicator<
 	public readonly deviceId: number;
 	public readonly isEquip: boolean;
 	public readonly name: string;
+	protected readonly logger: SecsLogger;
 
 	public timeoutT1 = 1;
 	public timeoutT2 = 15;
@@ -82,6 +85,11 @@ export abstract class AbstractSecsCommunicator<
 		if (config.timeoutT6 !== undefined) this.timeoutT6 = config.timeoutT6;
 		if (config.timeoutT7 !== undefined) this.timeoutT7 = config.timeoutT7;
 		if (config.timeoutT8 !== undefined) this.timeoutT8 = config.timeoutT8;
+		this.logger = SecsLogger.create(config.log, {
+			name: this.name,
+			deviceId: this.deviceId,
+			isEquip: this.isEquip,
+		});
 	}
 
 	abstract open(): Promise<void>;
@@ -103,6 +111,16 @@ export abstract class AbstractSecsCommunicator<
 	// This method sends the message bytes. To be implemented by subclasses.
 	protected abstract sendBuffer(buffer: Buffer): Promise<void>;
 
+	protected async sendBufferWithLogs(
+		direction: "Sent" | "Received",
+		protocol: string,
+		buffer: Buffer,
+		meta?: Record<string, unknown>,
+	): Promise<void> {
+		this.logger.logBytes(direction, protocol, buffer, meta);
+		await this.sendBuffer(buffer);
+	}
+
 	protected abstract createMessage(
 		stream: number,
 		func: number,
@@ -119,6 +137,20 @@ export abstract class AbstractSecsCommunicator<
 	): Promise<SecsMessage | null> {
 		const systemBytes = this.getNextSystemBytes();
 		const msg = this.createMessage(stream, func, wBit, body, systemBytes);
+		const sml = msg.toSml();
+		this.logger.logSecs2("Sent", sml);
+		this.logger.detail.debug(
+			{
+				protocol: "SECS",
+				dir: "Sent",
+				stream,
+				func,
+				wBit,
+				systemBytes,
+				sml,
+			},
+			"sml",
+		);
 
 		if (wBit) {
 			return new Promise((resolve, reject) => {
@@ -135,14 +167,34 @@ export abstract class AbstractSecsCommunicator<
 
 				this._transactions.set(systemBytes, { resolve, reject, timer });
 
-				this.sendBuffer(msg.toBuffer()).catch((err: unknown) => {
+				this.sendBufferWithLogs("Sent", "SECS", msg.toBuffer(), {
+					stream,
+					func,
+					wBit,
+					systemBytes,
+				}).catch((err: unknown) => {
 					clearTimeout(timer);
 					this._transactions.delete(systemBytes);
+					this.logger.detail.error(
+						{
+							err: err instanceof Error ? err : new Error(String(err)),
+							stream,
+							func,
+							wBit,
+							systemBytes,
+						},
+						"send failed",
+					);
 					reject(err instanceof Error ? err : new Error(String(err)));
 				});
 			});
 		} else {
-			await this.sendBuffer(msg.toBuffer());
+			await this.sendBufferWithLogs("Sent", "SECS", msg.toBuffer(), {
+				stream,
+				func,
+				wBit,
+				systemBytes,
+			});
 			return null;
 		}
 	}
@@ -160,9 +212,26 @@ export abstract class AbstractSecsCommunicator<
 			body,
 			primaryMsg.systemBytes,
 		);
-		console.log("Reply Buffer:", msg.toBuffer());
-		console.log(`Reply: ${msg.toSml()}`);
-		await this.sendBuffer(msg.toBuffer());
+		const sml = msg.toSml();
+		this.logger.logSecs2("Sent", sml);
+		this.logger.detail.debug(
+			{
+				protocol: "SECS",
+				dir: "Sent",
+				stream,
+				func,
+				wBit: false,
+				systemBytes: primaryMsg.systemBytes,
+				sml,
+			},
+			"sml",
+		);
+		await this.sendBufferWithLogs("Sent", "SECS", msg.toBuffer(), {
+			stream,
+			func,
+			wBit: false,
+			systemBytes: primaryMsg.systemBytes,
+		});
 	}
 
 	protected getNextSystemBytes(): number {
@@ -171,6 +240,21 @@ export abstract class AbstractSecsCommunicator<
 	}
 
 	protected handleMessage(msg: SecsMessage) {
+		const sml = msg.toSml();
+		this.logger.logSecs2("Received", sml);
+		this.logger.detail.debug(
+			{
+				protocol: "SECS",
+				dir: "Received",
+				stream: msg.stream,
+				func: msg.func,
+				wBit: msg.wBit,
+				systemBytes: msg.systemBytes,
+				deviceId: msg.deviceId,
+				sml,
+			},
+			"message",
+		);
 		// Check if it's a reply
 		// Usually, if we have a transaction waiting for this SystemBytes, we treat it as a reply.
 		// However, Stream 0 (HSMS Control) messages are never replies to SECS-II messages.

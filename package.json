@@ -51,6 +51,7 @@
 		"node": ">=20.19.0"
 	},
 	"dependencies": {
+		"pino": "^10.1.0",
 		"serialport": "^13.0.0"
 	}
 }

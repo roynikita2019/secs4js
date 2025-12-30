@@ -27,12 +27,24 @@ export class Secs1OnTcpIpPassiveCommunicator extends Secs1Communicator {
 		return new Promise((resolve, reject) => {
 			this.server = createServer((socket) => {
 				if (this.stream && !this.stream.destroyed) {
-					console.warn("Rejecting new connection (SECS-I Single Session)");
+					this.logger.detail.warn(
+						{
+							protocol: "SECS1",
+							remoteAddress: socket.remoteAddress,
+							remotePort: socket.remotePort,
+						},
+						"rejecting new connection (single session)",
+					);
 					socket.destroy();
 					return;
 				}
-				console.log(
-					`Accepted connection from ${socket.remoteAddress ?? "unknown"}:${socket.remotePort ?? "unknown"}`,
+				this.logger.detail.info(
+					{
+						protocol: "SECS1",
+						remoteAddress: socket.remoteAddress,
+						remotePort: socket.remotePort,
+					},
+					"accepted connection",
 				);
 				this.handleIncomingSocket(socket);
 			});

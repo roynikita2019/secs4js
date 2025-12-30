@@ -38,6 +38,14 @@ async function main() {
 		port: 5000,
 		deviceId: 10,
 		isEquip: false,
+		log: {
+			enabled: true,
+			baseDir: "./secs4js-logs",
+			retentionDays: 30,
+			detailLevel: "trace",
+			secs2Level: "info",
+			maxHexBytes: 65536,
+		},
 	});
 
 	active.on("connected", () => console.log("Active TCP Connected"));

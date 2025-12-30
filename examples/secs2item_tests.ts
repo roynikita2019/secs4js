@@ -1,12 +1,4 @@
-import {
-	A,
-	L,
-	U1,
-	Secs2ItemBinary,
-	Secs2ItemList,
-	SecsMessage,
-	Secs2ItemFactory,
-} from "../src/index.js";
+import { A, L, U1, Secs2ItemBinary, Secs2ItemList } from "../src/index.js";
 import { SmlParser } from "../src/sml/SmlParser.js";
 
 function testSecs2Item() {

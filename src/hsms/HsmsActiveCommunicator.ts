@@ -26,8 +26,14 @@ export class HsmsActiveCommunicator extends HsmsCommunicator {
 		this.on("disconnected", () => {
 			this.stopHeartbeat();
 			if (!this.shouldStop) {
-				console.log(
-					`Connection lost. Reconnecting in ${String(this.timeoutT5)}s...`,
+				this.logger.detail.warn(
+					{
+						protocol: "HSMS",
+						ip: this.ip,
+						port: this.port,
+						timeoutT5: this.timeoutT5,
+					},
+					"connection lost; scheduling reconnect",
 				);
 				this.scheduleReconnect();
 			}
@@ -58,8 +64,15 @@ export class HsmsActiveCommunicator extends HsmsCommunicator {
 
 		const onError = (err: Error) => {
 			socket.destroy();
-			console.log(
-				`Connection failed: ${err.message}. Retrying in ${String(this.timeoutT5)}s...`,
+			this.logger.detail.warn(
+				{
+					protocol: "HSMS",
+					ip: this.ip,
+					port: this.port,
+					timeoutT5: this.timeoutT5,
+					err,
+				},
+				"connection failed; scheduling reconnect",
 			);
 			if (!this.shouldStop) {
 				this.scheduleReconnect();
@@ -78,11 +91,13 @@ export class HsmsActiveCommunicator extends HsmsCommunicator {
 					// Select success, state updated in handleSelectRsp
 				})
 				.catch((err) => {
-					if (err instanceof Error) {
-						console.error(`SelectReq failed: ${err.message}`);
-					} else {
-						console.error(`SelectReq failed: ${err}`);
-					}
+					this.logger.detail.error(
+						{
+							protocol: "HSMS",
+							err: err instanceof Error ? err : new Error(String(err)),
+						},
+						"select request failed",
+					);
 					// If Select fails, close connection to trigger reconnect logic
 					if (!socket.destroyed) {
 						socket.destroy();
@@ -112,7 +127,13 @@ export class HsmsActiveCommunicator extends HsmsCommunicator {
 		try {
 			await this.sendLinkTestReq();
 		} catch (err) {
-			console.error("Heartbeat failed, closing connection:", err);
+			this.logger.detail.error(
+				{
+					protocol: "HSMS",
+					err: err instanceof Error ? err : new Error(String(err)),
+				},
+				"heartbeat failed; closing connection",
+			);
 			// Force close to trigger reconnect
 			if (this.socket) {
 				this.socket.destroy();

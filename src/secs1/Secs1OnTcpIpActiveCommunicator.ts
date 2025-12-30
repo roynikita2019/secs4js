@@ -24,8 +24,14 @@ export class Secs1OnTcpIpActiveCommunicator extends Secs1Communicator {
 		this.port = config.port;
 		this.on("disconnected", () => {
 			if (!this.shouldStop) {
-				console.log(
-					`Connection lost. Reconnecting in ${String(this.timeoutT5)}s...`,
+				this.logger.detail.warn(
+					{
+						protocol: "SECS1",
+						ip: this.ip,
+						port: this.port,
+						timeoutT5: this.timeoutT5,
+					},
+					"connection lost; scheduling reconnect",
 				);
 				this.scheduleReconnect();
 			}
@@ -55,8 +61,15 @@ export class Secs1OnTcpIpActiveCommunicator extends Secs1Communicator {
 
 		const onError = (err: Error) => {
 			socket.destroy();
-			console.log(
-				`Connection failed: ${err.message}. Retrying in ${String(this.timeoutT5)}s...`,
+			this.logger.detail.warn(
+				{
+					protocol: "SECS1",
+					ip: this.ip,
+					port: this.port,
+					timeoutT5: this.timeoutT5,
+					err,
+				},
+				"connection failed; scheduling reconnect",
 			);
 			if (!this.shouldStop) {
 				this.scheduleReconnect();

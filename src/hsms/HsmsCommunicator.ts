@@ -57,6 +57,23 @@ export abstract class HsmsCommunicator extends AbstractSecsCommunicator<HsmsComm
 		this.port = config.port;
 	}
 
+	protected override async sendBufferWithLogs(
+		direction: "Sent" | "Received",
+		protocol: string,
+		buffer: Buffer,
+		meta?: Record<string, unknown>,
+	): Promise<void> {
+		await super.sendBufferWithLogs(
+			direction,
+			protocol === "SECS" ? "HSMS" : protocol,
+			buffer,
+			{
+				hsmsState: this.state,
+				...meta,
+			},
+		);
+	}
+
 	protected async sendBuffer(buffer: Buffer): Promise<void> {
 		const socket = this.socket;
 		if (!socket || socket.destroyed) {
@@ -92,11 +109,21 @@ export abstract class HsmsCommunicator extends AbstractSecsCommunicator<HsmsComm
 
 	protected handleSocketEvents(socket: Socket) {
 		this.socket = socket;
+		const prev = this.state;
 		this.state = HsmsState.Connected;
+		this.logger.logState("HSMS", prev, this.state, {
+			remoteAddress: socket.remoteAddress,
+			remotePort: socket.remotePort,
+		});
 		this.resetT7Timer();
 		this.emit("connected");
 
 		socket.on("data", (data) => {
+			this.logger.logBytes("Received", "HSMS", data, {
+				remoteAddress: socket.remoteAddress,
+				remotePort: socket.remotePort,
+				chunkLength: data.length,
+			});
 			this.buffer = Buffer.concat([this.buffer, data]);
 			this.resetT8Timer();
 			this.processBuffer();
@@ -110,7 +137,12 @@ export abstract class HsmsCommunicator extends AbstractSecsCommunicator<HsmsComm
 			this.clearT7Timer();
 			this.clearT8Timer();
 			this.buffer = Buffer.alloc(0);
+			const prevState = this.state;
 			this.state = HsmsState.NotConnected;
+			this.logger.logState("HSMS", prevState, this.state, {
+				remoteAddress: socket.remoteAddress,
+				remotePort: socket.remotePort,
+			});
 			this.socket = null;
 			this.emit("disconnected");
 		});
@@ -190,6 +222,9 @@ export abstract class HsmsCommunicator extends AbstractSecsCommunicator<HsmsComm
 			this.buffer = this.buffer.subarray(4 + length);
 
 			try {
+				this.logger.logBytes("Received", "HSMS", msgBuffer, {
+					frameLength: length,
+				});
 				const msg = HsmsMessage.fromBuffer(msgBuffer);
 				this.processHsmsMessage(msg);
 			} catch (err) {
@@ -211,12 +246,23 @@ export abstract class HsmsCommunicator extends AbstractSecsCommunicator<HsmsComm
 	private processHsmsMessage(msg: HsmsMessage) {
 		// Handle Control Messages
 		if (msg.sType !== HsmsControlType.Data) {
+			this.logger.detail.debug(
+				{
+					protocol: "HSMS",
+					controlType: msg.sType,
+					pType: msg.pType,
+					systemBytes: msg.systemBytes,
+					deviceId: msg.deviceId,
+				},
+				"control",
+			);
 			this.handleControlMessage(msg);
 			return;
 		}
 
 		// Handle Data Messages
 		if (this.state !== HsmsState.Selected) {
+			this.logger.logSecs2("Received", msg.toSml());
 			void this.sendReject(msg, RejectReason.NotSelected);
 			return;
 		}
@@ -269,6 +315,9 @@ export abstract class HsmsCommunicator extends AbstractSecsCommunicator<HsmsComm
 		if (this.state === HsmsState.Selected) {
 			void this.sendSelectRsp(msg, SelectStatus.Actived); // Or AlreadyUsed?
 		} else {
+			this.logger.logState("HSMS", this.state, HsmsState.Selected, {
+				systemBytes: msg.systemBytes,
+			});
 			this.state = HsmsState.Selected;
 			this.clearT7Timer();
 			void this.sendSelectRsp(msg, SelectStatus.Success);
@@ -286,6 +335,10 @@ export abstract class HsmsCommunicator extends AbstractSecsCommunicator<HsmsComm
 			// In HsmsMessage.fromBuffer, for Control msg, func = byte 3.
 			const status = msg.func as SelectStatus;
 			if (status === SelectStatus.Success || status === SelectStatus.Actived) {
+				this.logger.logState("HSMS", this.state, HsmsState.Selected, {
+					selectStatus: status,
+					systemBytes: msg.systemBytes,
+				});
 				this.state = HsmsState.Selected;
 				this.clearT7Timer();
 				this.emit("selected");
@@ -315,6 +368,9 @@ export abstract class HsmsCommunicator extends AbstractSecsCommunicator<HsmsComm
 
 	protected handleDeselectReq(msg: HsmsMessage) {
 		if (this.state === HsmsState.Selected) {
+			this.logger.logState("HSMS", this.state, HsmsState.Connected, {
+				systemBytes: msg.systemBytes,
+			});
 			this.state = HsmsState.Connected;
 			this.resetT7Timer();
 			void this.sendDeselectRsp(msg, SelectStatus.Success);
@@ -329,6 +385,9 @@ export abstract class HsmsCommunicator extends AbstractSecsCommunicator<HsmsComm
 		if (tx) {
 			const status = msg.func as SelectStatus;
 			if (status === SelectStatus.Success) {
+				this.logger.logState("HSMS", this.state, HsmsState.Connected, {
+					systemBytes: msg.systemBytes,
+				});
 				this.state = HsmsState.Connected;
 				this.resetT7Timer();
 				this.emit("deselected");
@@ -343,7 +402,9 @@ export abstract class HsmsCommunicator extends AbstractSecsCommunicator<HsmsComm
 
 	protected handleSeparateReq(_msg: HsmsMessage) {
 		const socket = this.socket;
+		const prev = this.state;
 		this.state = HsmsState.Connected;
+		this.logger.logState("HSMS", prev, this.state);
 		this.clearT7Timer();
 		if (socket && !socket.destroyed) {
 			socket.destroy();
@@ -353,22 +414,37 @@ export abstract class HsmsCommunicator extends AbstractSecsCommunicator<HsmsComm
 	// Helper senders
 	protected async sendSelectRsp(req: HsmsMessage, status: number) {
 		const rsp = HsmsMessage.selectRsp(req, status);
-		await this.sendBuffer(rsp.toBuffer());
+		await this.sendBufferWithLogs("Sent", "HSMS", rsp.toBuffer(), {
+			controlType: HsmsControlType.SelectRsp,
+			status,
+			systemBytes: rsp.systemBytes,
+		});
 	}
 
 	protected async sendDeselectRsp(req: HsmsMessage, status: number) {
 		const rsp = HsmsMessage.deselectRsp(req, status);
-		await this.sendBuffer(rsp.toBuffer());
+		await this.sendBufferWithLogs("Sent", "HSMS", rsp.toBuffer(), {
+			controlType: HsmsControlType.DeselectRsp,
+			status,
+			systemBytes: rsp.systemBytes,
+		});
 	}
 
 	protected async sendLinkTestRsp(req: HsmsMessage) {
 		const rsp = HsmsMessage.linkTestRsp(req);
-		await this.sendBuffer(rsp.toBuffer());
+		await this.sendBufferWithLogs("Sent", "HSMS", rsp.toBuffer(), {
+			controlType: HsmsControlType.LinkTestRsp,
+			systemBytes: rsp.systemBytes,
+		});
 	}
 
 	protected async sendReject(req: HsmsMessage, reason: RejectReason) {
 		const rsp = HsmsMessage.rejectReq(req, reason);
-		await this.sendBuffer(rsp.toBuffer());
+		await this.sendBufferWithLogs("Sent", "HSMS", rsp.toBuffer(), {
+			controlType: HsmsControlType.RejectReq,
+			reason,
+			systemBytes: rsp.systemBytes,
+		});
 	}
 
 	override async send(
@@ -404,7 +480,10 @@ export abstract class HsmsCommunicator extends AbstractSecsCommunicator<HsmsComm
 				timer,
 			});
 
-			this.sendBuffer(msg.toBuffer()).catch((err: unknown) => {
+			this.sendBufferWithLogs("Sent", "HSMS", msg.toBuffer(), {
+				controlType: HsmsControlType.SelectReq,
+				systemBytes,
+			}).catch((err: unknown) => {
 				clearTimeout(timer);
 				this._transactions.delete(systemBytes);
 				reject(err instanceof Error ? err : new Error(String(err)));
@@ -432,7 +511,10 @@ export abstract class HsmsCommunicator extends AbstractSecsCommunicator<HsmsComm
 				timer,
 			});
 
-			this.sendBuffer(msg.toBuffer()).catch((err: unknown) => {
+			this.sendBufferWithLogs("Sent", "HSMS", msg.toBuffer(), {
+				controlType: HsmsControlType.LinkTestReq,
+				systemBytes,
+			}).catch((err: unknown) => {
 				clearTimeout(timer);
 				this._transactions.delete(systemBytes);
 				reject(err instanceof Error ? err : new Error(String(err)));
@@ -443,9 +525,14 @@ export abstract class HsmsCommunicator extends AbstractSecsCommunicator<HsmsComm
 	public async sendSeparateReq(): Promise<void> {
 		const systemBytes = this.getNextSystemBytes();
 		const msg = HsmsMessage.separateReq(systemBytes);
-		await this.sendBuffer(msg.toBuffer());
+		await this.sendBufferWithLogs("Sent", "HSMS", msg.toBuffer(), {
+			controlType: HsmsControlType.SeparateReq,
+			systemBytes,
+		});
 		const socket = this.socket;
+		const prev = this.state;
 		this.state = HsmsState.Connected;
+		this.logger.logState("HSMS", prev, this.state, { systemBytes });
 		this.clearT7Timer();
 		if (socket && !socket.destroyed) {
 			socket.destroy();

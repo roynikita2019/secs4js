@@ -9,6 +9,8 @@ export default defineConfig(
 			"eslint.config.js",
 			"**/*.snap",
 			"coverage",
+			"logs",
+			"logs*",
 			"lib",
 			"node_modules",
 			"pnpm-lock.yaml",
