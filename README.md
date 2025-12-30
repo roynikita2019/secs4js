@@ -159,6 +159,33 @@ const parsedBody = SmlParser.parseBody(smlBody);
 console.log(parsedBody?.toSml());
 ```
 
+## Sending and Replying to Messages
+
+In this library, you can actively send messages and passively reply to messages.
+
+For actively sent messages, a new `SystemBytes` will be automatically generated. For reply messages, the `SystemBytes` from the primary message will be automatically read and used for the reply.
+
+- **Send:** `send(stream: number, func: number, wBit: boolean, body?: AbstractSecs2Item)`
+- **Reply:** `reply(primaryMsg: SecsMessage, stream: number, func: number, body?: AbstractSecs2Item)`
+
+```ts
+active.on("message", (msg: SecsMessage) => {
+	void (async () => {
+		console.log(`Active received: ${msg.toSml()}`);
+
+		await active.send(2, 18, true, L());
+
+		if (msg.stream === 1 && msg.func === 1) {
+			await active.reply(msg, 1, 2, L(A("MDLN-A"), A("SOFTREV-1")));
+		}
+
+		if (msg.stream === 1 && msg.func === 13) {
+			await active.reply(msg, 1, 14, L(A("ACK")));
+		}
+	})();
+});
+```
+
 ## HSMS-SS
 
 For HSMS-SS protocol support, you can act as the passive end (Equipment) or the active end (HOST/EAP).
@@ -431,6 +458,63 @@ async function TcpPassive() {
 	await passive.open();
 	console.log("Passive server started");
 }
+```
+
+## GEM
+
+This library provides partial `GEM` (Generic Equipment Model) support. You can access commonly used GEM methods through the `Gem` object.
+
+```ts
+// 1. Set up equipment side (Passive)
+const equipComm = new HsmsPassiveCommunicator({
+	ip: "127.0.0.1",
+	port: 5000,
+	deviceId: 1,
+	isEquip: true,
+	name: "Equipment",
+});
+
+// Use the GEM helper class (optional)
+const equipGem = new Gem(equipComm);
+equipGem.mdln = "MyEquip";
+equipGem.softrev = "1.0.0";
+
+equipComm.on("message", (msg: SecsMessage) => {
+	void (async () => {
+		console.log(`Passive received: ${msg.toSml()}`);
+
+		// Reply to Host using messages defined in the Generic Equipment Model
+		if (msg.stream === 1 && msg.func === 1) {
+			await equipGem.s1f2(msg);
+		}
+	})();
+});
+```
+
+## Logging
+
+Logging is implemented using the `Pino` library.
+
+There are two types of logs: `DETAIL` logs that record all detailed information, and SECS-II `SML` logs that only record bidirectional communication. The default level for DETAIL logs is `DEBUG`, and the default level for SECS-II logs is `INFO`.
+
+You can configure logging properties by passing the `log` configuration parameter when initializing the communicator.
+
+```ts
+const active = new HsmsActiveCommunicator({
+	ip: "127.0.0.1",
+	port: 5000,
+	deviceId: 10,
+	isEquip: false,
+	log: {
+		enabled: true, // Whether to enable logging
+		console: true, // Whether to output logs to console
+		baseDir: "./secs4js-logs", // Path for log storage
+		retentionDays: 30, // Number of days to retain logs
+		detailLevel: "trace", // Level for DETAIL logs
+		secs2Level: "info", // Level for SECS-II logs
+		maxHexBytes: 65536, // Maximum number of hex bytes to record
+	},
+});
 ```
 
 ## Development

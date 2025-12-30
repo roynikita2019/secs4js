@@ -159,6 +159,31 @@ const parsedBody = SmlParser.parseBody(smlBody);
 console.log(parsedBody?.toSml());
 ```
 
+## 发送消息与回复消息
+
+在库中，您可以进行消息的主动发送和被动回复。
+主动发送的消息我们会自动生成新的 `SystemBytes`，作为回复的消息会自动读取主消息的 `SystemBytes` 并采用这个值进行回复。
+
+- 发送：`send(stream: number, func: number, wBit: boolean, body?: AbstractSecs2Item)`
+- 回复：`reply(primaryMsg: SecsMessage, stream: number, func: number, body?: AbstractSecs2Item)`
+
+```ts
+active.on("message", (msg: SecsMessage) => {
+	void (async () => {
+		console.log(`Active received: ${msg.toSml()}`);
+
+		await active.send(2, 18, true, L());
+
+		if (msg.stream === 1 && msg.func === 1) {
+			await active.reply(msg, 1, 2, L(A("MDLN-A"), A("SOFTREV-1")));
+		}
+		if (msg.stream === 1 && msg.func === 13) {
+			await active.reply(msg, 1, 14, L(A("ACK")));
+		}
+	})();
+});
+```
+
 ## HSMS-SS
 
 对 HSMS-SS 协议的支持，您可以作为被动端（设备）或主动端（HOST/EAP）。
@@ -431,6 +456,61 @@ async function TcpPassive() {
 	await passive.open();
 	console.log("Passive server started");
 }
+```
+
+## Gem
+
+提供部分 `Gem` 支持，你可以通过 Gem 对象获取部分常用的 Gem 方法。
+
+```ts
+// 1. 设置设备端 (Passive)
+const equipComm = new HsmsPassiveCommunicator({
+	ip: "127.0.0.1",
+	port: 5000,
+	deviceId: 1,
+	isEquip: true,
+	name: "Equipment",
+});
+
+// 使用 GEM 助手类（可选）
+const equipGem = new Gem(equipComm);
+equipGem.mdln = "MyEquip";
+equipGem.softrev = "1.0.0";
+
+equipComm.on("message", (msg: SecsMessage) => {
+	void (async () => {
+		console.log(`Passive received: ${msg.toSml()}`);
+		// 通过通用设备模型定义的消息回复Host端
+		if (msg.stream === 1 && msg.func === 1) {
+			await equipGem.s1f2(msg);
+		}
+	})();
+});
+```
+
+## 日志
+
+日志使用 `Pino` 库进行记录。
+日志分为两种，第一种是记录所有详细信息的 `DETAIL` 日志，第二种是仅记录双端交流的SECS-II `SML` 日志，DETAIL日志的默认级别为`DEBUG`，SECS-II日志的默认级别为`INFO`。
+
+您可以在初始化通信器时通过传递 `log` 配置参数来配置日志的属性。
+
+```ts
+const active = new HsmsActiveCommunicator({
+	ip: "127.0.0.1",
+	port: 5000,
+	deviceId: 10,
+	isEquip: false,
+	log: {
+		enabled: true, // 是否启用日志记录
+		console: true, // 是否输出日志到控制台
+		baseDir: "./secs4js-logs", // 日志存储的路径
+		retentionDays: 30, // 日志保留的天数
+		detailLevel: "trace", // DETAIL日志的级别
+		secs2Level: "info", // SECS-II日志的级别
+		maxHexBytes: 65536, // 最大记录的十六进制字节数
+	},
+});
 ```
 
 ## 开发
