@@ -40,6 +40,7 @@ async function main() {
 		isEquip: false,
 		log: {
 			enabled: true,
+			console: true,
 			baseDir: "./secs4js-logs",
 			retentionDays: 30,
 			detailLevel: "trace",

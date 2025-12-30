@@ -7,6 +7,7 @@ export type SecsLogDirection = "Received" | "Sent";
 
 export interface SecsLoggerConfig {
 	enabled?: boolean;
+	console?: boolean;
 	baseDir?: string;
 	retentionDays?: number;
 	detailLevel?: LevelWithSilent;
@@ -320,6 +321,7 @@ export class SecsLogger {
 		ctx: SecsLoggerContext,
 	): SecsLogger {
 		const enabled = config?.enabled ?? false;
+		const consoleEnabled = config?.console ?? false;
 		if (!enabled) return SecsLogger.disabled();
 
 		const baseDir = config?.baseDir
@@ -348,14 +350,32 @@ export class SecsLogger {
 			isEquip: ctx.isEquip,
 		};
 
-		const detail = pino({ level: detailLevel, base: bindings }, detailStream);
+		const detailStreams: pino.StreamEntry[] = [{ stream: detailStream }];
+		if (consoleEnabled) {
+			detailStreams.push({
+				stream: process.stdout,
+				level: detailLevel as pino.Level,
+			});
+		}
+		const detail = pino(
+			{ level: detailLevel, base: bindings },
+			pino.multistream(detailStreams),
+		);
+
+		const secs2Streams: pino.StreamEntry[] = [{ stream: secs2Stream }];
+		if (consoleEnabled) {
+			secs2Streams.push({
+				stream: process.stdout,
+				level: secs2Level as pino.Level,
+			});
+		}
 		const secs2 = pino(
 			{
 				level: secs2Level,
 				base: null,
 				messageKey: "msg",
 			},
-			secs2Stream,
+			pino.multistream(secs2Streams),
 		);
 
 		return new SecsLogger({
