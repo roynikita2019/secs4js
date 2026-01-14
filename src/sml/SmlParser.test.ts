@@ -50,4 +50,40 @@ describe("SmlParser enhancements", () => {
 			0x00, 0x0a, 0x10,
 		]);
 	});
+
+	it("parses empty-content items for SEMI-allowed types", () => {
+		const parsed = SmlParser.parseBody(`
+			<L
+				<U4>
+				<A>
+				<B>
+				<U1>
+				<U2>
+				<U8>
+				<I1>
+				<I2>
+				<I4>
+				<I8>
+				<F4>
+				<F8>
+				<L>
+			>
+		`);
+
+		expect(parsed).toBeInstanceOf(Secs2ItemList);
+		const outer = parsed as Secs2ItemList;
+		expect(outer.value.length).toBe(13);
+
+		const u4 = outer.value[0];
+		expect(u4).toBeInstanceOf(Secs2ItemNumeric);
+		expect((u4 as Secs2ItemNumeric).valueAsArray).toEqual([]);
+
+		const a = outer.value[1];
+		expect(a).toBeInstanceOf(Secs2ItemAscii);
+		expect((a as Secs2ItemAscii).value).toBe("");
+
+		const b = outer.value[2];
+		expect(b).toBeInstanceOf(Secs2ItemBinary);
+		expect((b as Secs2ItemBinary).value.length).toBe(0);
+	});
 });
